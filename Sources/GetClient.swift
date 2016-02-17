@@ -41,8 +41,7 @@ public class GetClient {
 		#endif
 	}
 
-	public func fetch(urlString: String) -> String {
-
+	public func fetch(urlString: String) -> (responseCode: String, headers: [String : String], response: String) {
 		let url = URL(string: urlString)
 
 		let ipAddress = self.getIPFromHost(url.host)
@@ -66,7 +65,20 @@ public class GetClient {
 		var buf = [CChar](count:Int(bufferSize), repeatedValue: 0)
 		recv(sock, &buf, bufferSize, 0)
 		
-		return String.fromCString(buf)!
+    let response = String.fromCString(buf)!
+    let exploded = response.componentsSeparatedByString("\r\n\r\n")
+    
+    let headers = exploded[0].componentsSeparatedByString("\r\n")
+    
+    let responseCode = headers[0].componentsSeparatedByString(" ")[1]
+    
+    var headersDictionary = [String : String]()
+    for header in headers.dropFirst() {
+      let headerExploded = header.componentsSeparatedByString(": ")
+      headersDictionary[headerExploded[0]] = headerExploded[1]
+    }
+      
+    return (responseCode, headersDictionary, exploded.count > 1 ? exploded[1] : "")
 	}
 
 	private func getIPFromHost(hostName: String) -> String {
@@ -83,4 +95,80 @@ public class GetClient {
 	private func htons(value: UInt16) -> UInt16 {
 		return (value << 8) + (value >> 8);
 	}
+}
+
+///Shamelessly copied from https://github.com/erica/SwiftString/blob/master/Sources/String.swift
+public extension String {
+
+    /// Range of first match to string
+    ///
+    /// Performance note: "not very". This is a stop-gap for light
+    /// use and not a fast solution
+    ///
+    public func rangeOfString(searchString: String) -> Range<Index>? {
+
+        // If equality, return full range
+        if searchString == self { return startIndex..<endIndex }
+
+        // Basic sanity checks
+        let (count, stringCount) = (characters.count, searchString.characters.count)
+        guard !isEmpty && !searchString.isEmpty && stringCount < count else { return nil }
+
+        // Moving search offset. Thanks Josh W
+        let stringCharacters = characters
+        let searchCharacters = searchString.characters
+        var searchOffset = stringCharacters.startIndex
+        let searchLimit = stringCharacters.endIndex.advancedBy(-stringCount, limit:  stringCharacters.startIndex)
+        var failedMatch = true
+
+        // March character checks through string
+        while searchOffset <= searchLimit {
+            failedMatch = false
+
+            // Enumerate through characters
+            for (idx, c) in searchCharacters.enumerate() {
+                if c != stringCharacters[searchOffset.advancedBy(idx, limit: stringCharacters.endIndex)] {
+                    failedMatch = true; break
+                }
+            }
+
+            // Test for success
+            guard failedMatch else { break }
+
+            // Offset search by one character
+            searchOffset = searchOffset.successor()
+        }
+
+        return failedMatch ? nil : searchOffset..<searchOffset.advancedBy(stringCount, limit:searchString.endIndex)
+    }
+
+    /// Mimic NSString's version
+    ///
+    /// Performance note: "not very". This is a stop-gap for light
+    /// use and not a fast solution
+    ///
+    public func componentsSeparatedByString(separator:  String) -> [String] {
+        var components: [String] = []
+        var searchString = self
+
+        // Find a match
+        while let range = searchString.rangeOfString(separator) {
+
+            // Break off first item (thanks Josh W)
+            let searchStringCharacters = searchString.characters
+            let first = String(searchStringCharacters.prefixUpTo(range.startIndex))
+            if !first.isEmpty { components.append(first) }
+
+            // Anything left to find?
+            if range.endIndex == searchString.endIndex {
+                return components.isEmpty ? [self] : components
+            }
+
+            // Move past the separator and continue
+            searchString = String(searchStringCharacters.suffixFrom(range.endIndex))
+        }
+
+        if !searchString.isEmpty { components.append(searchString) }
+        return components
+    }
 }

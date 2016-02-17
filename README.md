@@ -17,4 +17,7 @@ let result = client.fetch("http://httpbin.org/get?a=b")
 result is a tuple `(responseCode: String, headers: [String : String], response: String)`
 
 
-More Info : http://ankit.im/swift/2015/12/06/developing-and-debugging-swift-packages-using-swift-package-manager/
+More : 
+
+http://ankit.im/swift/2016/02/17/swift-package-manager-testing-preview/
+http://ankit.im/swift/2015/12/06/developing-and-debugging-swift-packages-using-swift-package-manager/
